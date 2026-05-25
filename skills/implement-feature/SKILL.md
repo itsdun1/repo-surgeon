@@ -15,9 +15,9 @@ metadata:
   version: 1.0.0
   category: feature-development
   risk_tier: medium
-confidence: 0.8
-usage_count: 1
-success_count: 0
+confidence: 0.82
+usage_count: 2
+success_count: 1
 failure_count: 1
 negative_examples:
   - 'Unable to run Jest tests in target repo: `jest` command not found in PATH; cannot open PR per RULE 13.'
