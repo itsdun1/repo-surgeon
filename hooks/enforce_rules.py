@@ -32,6 +32,28 @@ FORBIDDEN_GLOBS = [
     "**/*.crt",
 ]
 
+# RULE 4: dependency lockfiles are noise in PRs. Block at write + at git add.
+LOCKFILE_GLOBS = [
+    "**/package-lock.json",
+    "package-lock.json",
+    "**/pnpm-lock.yaml",
+    "pnpm-lock.yaml",
+    "**/yarn.lock",
+    "yarn.lock",
+    "**/poetry.lock",
+    "poetry.lock",
+    "**/Pipfile.lock",
+    "Pipfile.lock",
+    "**/Cargo.lock",
+    "Cargo.lock",
+    "**/Gemfile.lock",
+    "Gemfile.lock",
+    "**/composer.lock",
+    "composer.lock",
+    "**/go.sum",
+    "go.sum",
+]
+
 BINARY_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".zip", ".tar", ".gz", ".so", ".dll", ".exe", ".pdf", ".woff", ".woff2"}
 
 # Git commands that violate rules 5, 6, 7
@@ -49,6 +71,15 @@ def matches_forbidden(path: str) -> str | None:
     """Return matching glob, or None."""
     path = path.lstrip("./")
     for g in FORBIDDEN_GLOBS:
+        if fnmatch.fnmatch(path, g):
+            return g
+    return None
+
+
+def matches_lockfile(path: str) -> str | None:
+    """Return matching lockfile glob, or None."""
+    path = path.lstrip("./")
+    for g in LOCKFILE_GLOBS:
         if fnmatch.fnmatch(path, g):
             return g
     return None
@@ -88,6 +119,18 @@ def main():
                 )
             )
             return
+        lockfile_glob = matches_lockfile(file_path)
+        if lockfile_glob:
+            print(
+                json.dumps(
+                    {
+                        "action": "block",
+                        "reason": f"RULE-4: cannot modify dependency lockfile '{file_path}'. Lockfiles regenerate from the manifest. If you added a real dependency, commit ONLY the manifest (package.json / pyproject.toml / etc.), not the lockfile.",
+                        "audit": {"rule": "RULE-4", "path": file_path, "glob": lockfile_glob},
+                    }
+                )
+            )
+            return
 
     # --- cli git checks ---
     if tool_name == "cli":
@@ -117,6 +160,20 @@ def main():
                 )
             )
             return
+        # RULE 4: block `git add <lockfile>`
+        if cmd.startswith("git add"):
+            for arg in cmd.split()[2:]:
+                if matches_lockfile(arg.strip().strip('"').strip("'")):
+                    print(
+                        json.dumps(
+                            {
+                                "action": "block",
+                                "reason": f"RULE-4: do not stage lockfile '{arg}'. Lockfiles regenerate from the manifest. Stage ONLY the manifest (package.json / pyproject.toml / etc.).",
+                                "audit": {"rule": "RULE-4", "command": cmd[:200], "lockfile": arg},
+                            }
+                        )
+                    )
+                    return
 
     # --- github-api checks ---
     if tool_name == "github-api":
