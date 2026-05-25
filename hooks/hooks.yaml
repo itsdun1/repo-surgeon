@@ -14,38 +14,38 @@ spec_version: "0.1"
 
 hooks:
   on_session_start:
-    - script: load_memory_namespace.py
+    - script: load_memory_namespace.sh
       runtime: python3
       timeout: 10
       description: Load org + per-repo memory based on TARGET_REPO env
 
   pre_tool_use:
-    - script: enforce_rules.py
+    - script: enforce_rules.sh
       runtime: python3
       timeout: 5
       description: Block writes to forbidden paths and unsafe git ops
       applies_to: [write, edit, cli, github-api]
 
   post_tool_use:
-    - script: audit_log.py
+    - script: audit_log.sh
       runtime: python3
       timeout: 5
       description: Append redacted JSON line to hooks/audit-trail.jsonl
 
   post_response:
-    - script: extract_learnings.py
+    - script: extract_learnings.sh
       runtime: python3
       timeout: 15
       description: Scan response for LESSON/CONVENTION/SMELL/WONT-FIX sentinels
 
   on_session_end:
-    - script: commit_memory.py
+    - script: commit_memory.sh
       runtime: python3
       timeout: 30
       description: Dedupe session scratch, commit and push memory updates
 
   on_error:
-    - script: audit_log.py
+    - script: audit_log.sh
       runtime: python3
       timeout: 5
       description: Log errors for debugging

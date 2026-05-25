@@ -71,13 +71,14 @@ steps:
     tool: cli
     inputs:
       command: |
-        rm -rf ${{ env.TARGET_DIR }}
-        mkdir -p ${{ env.TARGET_DIR }}
-        git clone --depth=50 https://x-access-token:${{ inputs.github_pat }}@github.com/${{ inputs.target_repo }}.git ${{ env.TARGET_DIR }}
         cd ${{ env.TARGET_DIR }}
         git config user.email "repo-surgeon[bot]@users.noreply.github.com"
         git config user.name "repo-surgeon[bot]"
-        git checkout -b surgeon/${{ session.id }}
+        git checkout -b surgeon/${{ session.id }} 2>/dev/null || git checkout surgeon/${{ session.id }}
+        # Install deps so `run-tests` can actually execute
+        if [ -f package.json ]; then npm install --no-audit --no-fund --silent || true; fi
+        if [ -f pyproject.toml ]; then pip install --quiet -e . 2>/dev/null || pip install --quiet pytest 2>/dev/null || true; fi
+        if [ -f requirements.txt ]; then pip install --quiet -r requirements.txt 2>/dev/null || true; fi
     depends_on: [classify]
 
   - id: detect_conv
