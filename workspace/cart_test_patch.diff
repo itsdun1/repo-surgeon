@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: src/__tests__/cart.test.ts
+@@
+   it("totals integer-priced items", () => {
+@@
+     expect(total).toBe(25);
+   });
+ 
+-  // NOTE: regression test for the decimal-price bug is intentionally missing.
+-  // Surgeon should add it as part of the fix.
++  it("handles decimal-priced items without losing cents (issue #1)", () => {
++    const total = calculateCartTotal([
++      { id: 1, name: "A", price: 3.99, quantity: 1 },
++      { id: 2, name: "B", price: 1.5, quantity: 1 },
++    ]);
++
++    expect(total).toBe(5.49);
++  });
+ });
+*** End Patch
