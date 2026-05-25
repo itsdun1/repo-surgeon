@@ -1,15 +1,26 @@
 ---
 name: implement-feature
-description: >
-  Given a classified feature issue, decompose into steps, implement
-  incrementally, write tests. Conservative — prefers smaller scope.
+description: |
+  Given a classified feature issue, decompose into steps, implement incrementally, write tests. Conservative — prefers smaller scope.
 license: Apache-2.0
-allowed-tools: [read, edit, write, task_tracker, codebase-grep, detect-conventions]
+allowed-tools:
+  - read
+  - edit
+  - write
+  - task_tracker
+  - codebase-grep
+  - detect-conventions
 metadata:
   author: repo-surgeon
   version: 1.0.0
   category: feature-development
   risk_tier: medium
+confidence: 0.8
+usage_count: 1
+success_count: 0
+failure_count: 1
+negative_examples:
+  - 'Unable to run Jest tests in target repo: `jest` command not found in PATH; cannot open PR per RULE 13.'
 ---
 
 ## Instructions
