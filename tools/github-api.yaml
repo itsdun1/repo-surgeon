@@ -1,0 +1,63 @@
+name: github-api
+version: 1.0.0
+description: >
+  Open PRs, comment on issues, add labels, fetch issues, push branches. The
+  agent's primary interface for GitHub-side operations.
+
+input_schema:
+  type: object
+  required: [action, repo]
+  properties:
+    action:
+      type: string
+      enum: [open_pr, comment, label, get_issue, list_issues, push_branch, list_recent_prs]
+    repo:
+      type: string
+      description: "owner/name format"
+    branch:
+      type: string
+    base:
+      type: string
+      default: main
+    title:
+      type: string
+      maxLength: 70
+    body:
+      type: string
+    labels:
+      type: array
+      items: {type: string}
+    issue_number:
+      type: integer
+    comment_body:
+      type: string
+    author:
+      type: string
+      description: "for list_recent_prs filter"
+    since:
+      type: string
+      description: "ISO timestamp for list_recent_prs"
+
+output_schema:
+  type: object
+  properties:
+    success: {type: boolean}
+    pr_number: {type: integer}
+    pr_url: {type: string}
+    issue_data: {type: object}
+    issues: {type: array}
+    prs: {type: array}
+    error: {type: string}
+
+implementation:
+  type: script
+  path: tools/github-api.py
+  runtime: python3
+  timeout: 30
+
+annotations:
+  requires_confirmation: false
+  read_only: false
+  cost: 0
+  idempotent: false
+  compliance_sensitive: true

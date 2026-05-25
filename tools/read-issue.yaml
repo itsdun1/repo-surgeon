@@ -1,0 +1,48 @@
+name: read-issue
+version: 1.0.0
+description: >
+  Fetch a GitHub issue with title, body, labels, author, comments, and linked PRs.
+  Read-only.
+
+input_schema:
+  type: object
+  required: [repo, issue_number]
+  properties:
+    repo:
+      type: string
+      description: "owner/name"
+    issue_number:
+      type: integer
+    include_comments:
+      type: boolean
+      default: true
+    max_comments:
+      type: integer
+      default: 50
+
+output_schema:
+  type: object
+  properties:
+    title: {type: string}
+    body: {type: string}
+    labels: {type: array}
+    author: {type: string}
+    state: {type: string}
+    created_at: {type: string}
+    updated_at: {type: string}
+    comments: {type: array}
+    linked_prs: {type: array}
+    error: {type: string}
+
+implementation:
+  type: script
+  path: tools/read-issue.py
+  runtime: python3
+  timeout: 20
+
+annotations:
+  requires_confirmation: false
+  read_only: true
+  cost: 0
+  idempotent: true
+  compliance_sensitive: false

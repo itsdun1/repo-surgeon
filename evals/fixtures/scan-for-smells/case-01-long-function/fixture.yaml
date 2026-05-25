@@ -1,0 +1,39 @@
+id: scan-long-function-01
+mode: scan-for-smells
+target_repo: eval-target
+# A frozen mini-repo with a deliberately long function
+# (created by hand, not via target_repo_archive, to keep eval lightweight)
+seed_files:
+  - path: "src/billing.py"
+    content: |
+      def calculate_invoice(customer, items, discount_codes, tax_jurisdiction):
+          # 80+ lines of intentionally tangled logic
+          subtotal = 0
+          for item in items:
+              if item.kind == "physical":
+                  if item.weight_kg < 0.5:
+                      shipping = 5
+                  elif item.weight_kg < 2:
+                      shipping = 10
+                  else:
+                      shipping = 20
+                  subtotal += item.price + shipping
+              elif item.kind == "digital":
+                  subtotal += item.price
+              else:
+                  raise ValueError(f"unknown kind: {item.kind}")
+          # ... (more cases)
+          # ... (discount logic)
+          # ... (tax logic)
+          # ... (rounding)
+          return total
+assertions:
+  - kind: must_flag
+    path: "src/billing.py"
+    smell: "long_function"
+  - kind: must_not_flag
+    path: "src/billing.py"
+    smell: "duplicate_block"  # there isn't one
+budget:
+  max_cost_usd: 0.15
+  max_duration_s: 120

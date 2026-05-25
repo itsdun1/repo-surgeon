@@ -1,0 +1,51 @@
+spec_version: "0.1"
+
+# Hooks fire at lifecycle events. Each script receives JSON via stdin and
+# returns JSON via stdout. See individual scripts for shape.
+#
+# Available events:
+#   on_session_start  — fires once when the agent starts a session
+#   pre_tool_use      — fires before any tool invocation; can block
+#   post_tool_use     — fires after tool execution
+#   post_tool_failure — fires when tool execution fails
+#   post_response     — fires after every assistant turn
+#   on_session_end    — fires once when the session terminates
+#   on_error          — fires on any unhandled error
+
+hooks:
+  on_session_start:
+    - script: hooks/load_memory_namespace.py
+      runtime: python3
+      timeout: 10
+      description: Load org + per-repo memory based on TARGET_REPO env
+
+  pre_tool_use:
+    - script: hooks/enforce_rules.py
+      runtime: python3
+      timeout: 5
+      description: Block writes to forbidden paths and unsafe git ops
+      applies_to: [write, edit, cli, github-api]
+
+  post_tool_use:
+    - script: hooks/audit_log.py
+      runtime: python3
+      timeout: 5
+      description: Append redacted JSON line to hooks/audit-trail.jsonl
+
+  post_response:
+    - script: hooks/extract_learnings.py
+      runtime: python3
+      timeout: 15
+      description: Scan response for LESSON/CONVENTION/SMELL/WONT-FIX sentinels
+
+  on_session_end:
+    - script: hooks/commit_memory.py
+      runtime: python3
+      timeout: 30
+      description: Dedupe session scratch, commit and push memory updates
+
+  on_error:
+    - script: hooks/audit_log.py
+      runtime: python3
+      timeout: 5
+      description: Log errors for debugging

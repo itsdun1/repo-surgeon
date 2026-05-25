@@ -1,0 +1,60 @@
+name: codebase-grep
+version: 1.0.0
+description: >
+  Literal, regex, or hybrid search over the target repo. Ranked snippets with
+  file path and line range. Prefers ripgrep if available; falls back to git grep.
+
+input_schema:
+  type: object
+  required: [query, working_dir]
+  properties:
+    query:
+      type: string
+    working_dir:
+      type: string
+    mode:
+      type: string
+      enum: [literal, regex, word]
+      default: literal
+    max_results:
+      type: integer
+      default: 30
+      maximum: 200
+    include_globs:
+      type: array
+      items: {type: string}
+      description: "e.g. ['*.ts', '*.py']"
+    exclude_globs:
+      type: array
+      items: {type: string}
+    case_sensitive:
+      type: boolean
+      default: false
+
+output_schema:
+  type: object
+  properties:
+    matches:
+      type: array
+      items:
+        type: object
+        properties:
+          path: {type: string}
+          line: {type: integer}
+          snippet: {type: string}
+    total_matches: {type: integer}
+    truncated: {type: boolean}
+    error: {type: string}
+
+implementation:
+  type: script
+  path: tools/codebase-grep.py
+  runtime: python3
+  timeout: 60
+
+annotations:
+  requires_confirmation: false
+  read_only: true
+  cost: 0
+  idempotent: true
+  compliance_sensitive: false

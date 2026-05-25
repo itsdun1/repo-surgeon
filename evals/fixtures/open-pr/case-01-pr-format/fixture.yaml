@@ -1,0 +1,15 @@
+id: open-pr-format-01
+mode: open-pr
+target_repo: eval-target
+context:
+  diff_summary: "Added null check in renderDashboard"
+  issue_number: 42
+  classification: bug
+assertions:
+  - kind: title_format_valid
+  - kind: body_sections_complete
+  - kind: labels_correct
+    expected: ["surgeon:bug", "needs-review"]
+budget:
+  max_cost_usd: 0.05
+  max_duration_s: 30

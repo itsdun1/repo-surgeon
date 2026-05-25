@@ -1,0 +1,48 @@
+name: detect-conventions
+version: 1.0.0
+description: >
+  Statically analyze the target repo to detect conventions — language, test
+  framework, linter, formatter, import style, error-handling pattern, PR
+  branch pattern. Idempotent — writes findings to memory/repos/<repo>/conventions.md.
+
+input_schema:
+  type: object
+  required: [working_dir, repo_name]
+  properties:
+    working_dir:
+      type: string
+    repo_name:
+      type: string
+      description: "Used as the memory namespace key"
+    write_to_memory:
+      type: boolean
+      default: true
+    agent_dir:
+      type: string
+      description: "Path to repo-surgeon GAP repo; defaults to env AGENT_REPO_PATH"
+
+output_schema:
+  type: object
+  properties:
+    language: {type: string}
+    test_framework: {type: string}
+    linter: {type: string}
+    formatter: {type: string}
+    import_style: {type: string}
+    error_handling: {type: string}
+    pr_branch_pattern: {type: string}
+    primary_runtime: {type: string}
+    memory_diff: {type: string}
+    error: {type: string}
+
+implementation:
+  type: script
+  path: tools/detect-conventions.py
+  runtime: python3
+  timeout: 90
+
+annotations:
+  requires_confirmation: false
+  read_only: false
+  idempotent: true
+  compliance_sensitive: false

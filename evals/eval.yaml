@@ -1,0 +1,57 @@
+spec_version: "0.1"
+name: repo-surgeon-evals
+version: 1.0.0
+description: >
+  Golden tests for the agent's critical skills. Runs against frozen target-repo
+  snapshots. Multi-runtime: each suite runs on both Claude and OpenAI.
+
+runner: evals/run_evals.py
+scorer: evals/score.py
+agent: ..               # parent dir is the agent under test
+fixtures_dir: evals/fixtures
+reports_dir: evals/reports
+
+runtimes:
+  - anthropic:claude-opus-4-7
+  - openai:gpt-5.1
+
+suites:
+  - name: classify-issue
+    skill: classify-issue
+    cases_glob: fixtures/classify-issue/case-*
+    metrics: [accuracy]
+    pass_threshold: {accuracy: 0.9}
+
+  - name: scan-for-smells
+    skill: scan-for-smells
+    cases_glob: fixtures/scan-for-smells/case-*
+    metrics: [precision_at_5, recall_at_10, false_positive_rate]
+    pass_threshold:
+      precision_at_5: 0.6
+      recall_at_10: 0.7
+
+  - name: fix-from-issue
+    skill: fix-from-issue
+    cases_glob: fixtures/fix-from-issue/case-*
+    metrics:
+      - failing_test_present
+      - test_passes_after_fix
+      - diff_minimal
+      - touches_only_expected_paths
+    pass_threshold:
+      failing_test_present: 1.0
+      test_passes_after_fix: 0.85
+
+  - name: open-pr
+    skill: open-pr
+    cases_glob: fixtures/open-pr/case-*
+    metrics: [title_format_valid, body_sections_complete, labels_correct]
+    pass_threshold:
+      title_format_valid: 1.0
+      body_sections_complete: 1.0
+
+ci:
+  run_on: [pull_request, push:main]
+  budget:
+    usd: 5.0
+    minutes: 30

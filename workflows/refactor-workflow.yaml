@@ -1,0 +1,143 @@
+name: refactor-workflow
+description: >
+  Cron-triggered nightly scan of the target repo. Picks ONE smell from the
+  ranked backlog, proposes a minimal refactor, validates with tests, opens PR.
+  Respects RULE 9 (max 1 refactor PR per repo per 24h).
+version: 1.0.0
+
+inputs:
+  - name: target_repo
+    type: string
+    required: true
+  - name: github_pat
+    type: string
+    required: true
+    secret: true
+
+outputs:
+  - name: pr_url
+  - name: skipped_reason
+
+steps:
+  - id: load_context
+    action: skill
+    skill: load-repo-context
+    inputs:
+      target_repo: ${{ inputs.target_repo }}
+
+  - id: gate_recent_pr
+    action: tool
+    tool: github-api
+    inputs:
+      action: list_recent_prs
+      repo: ${{ inputs.target_repo }}
+      author: "repo-surgeon[bot]"
+      since: ${{ env.NOW_MINUS_24H }}
+    depends_on: [load_context]
+
+  - id: stop_if_recent
+    action: control
+    conditions:
+      - if: "${{ steps.gate_recent_pr.outputs.prs | filter(p, p.labels contains 'surgeon:refactor') | length > 0 }}"
+    then:
+      - terminate:
+          skipped_reason: "RULE-9: a surgeon:refactor PR exists from the last 24h"
+    depends_on: [gate_recent_pr]
+
+  - id: clone
+    action: tool
+    tool: cli
+    inputs:
+      command: |
+        rm -rf ${{ env.TARGET_DIR }}
+        mkdir -p ${{ env.TARGET_DIR }}
+        git clone --depth=50 https://x-access-token:${{ inputs.github_pat }}@github.com/${{ inputs.target_repo }}.git ${{ env.TARGET_DIR }}
+        cd ${{ env.TARGET_DIR }}
+        git config user.email "repo-surgeon[bot]@users.noreply.github.com"
+        git config user.name "repo-surgeon[bot]"
+        git checkout -b surgeon/${{ session.id }}
+    depends_on: [stop_if_recent]
+
+  - id: detect_conv
+    action: tool
+    tool: detect-conventions
+    inputs:
+      working_dir: ${{ env.TARGET_DIR }}
+      repo_name: ${{ inputs.target_repo }}
+    depends_on: [clone]
+
+  - id: scan
+    action: skill
+    skill: scan-for-smells
+    inputs:
+      working_dir: ${{ env.TARGET_DIR }}
+      target_repo: ${{ inputs.target_repo }}
+    depends_on: [detect_conv]
+
+  - id: abort_if_no_smells
+    action: control
+    conditions:
+      - if: "${{ steps.scan.outputs.candidates | length == 0 }}"
+    then:
+      - terminate:
+          skipped_reason: "no smells worth fixing this scan"
+    depends_on: [scan]
+
+  - id: propose
+    action: skill
+    skill: propose-refactor
+    inputs:
+      candidates: ${{ steps.scan.outputs.candidates }}
+      working_dir: ${{ env.TARGET_DIR }}
+    depends_on: [abort_if_no_smells]
+    retry:
+      max_attempts: 2
+      on: tool_error
+
+  - id: tests
+    action: skill
+    skill: run-tests-validate
+    inputs:
+      working_dir: ${{ env.TARGET_DIR }}
+      scope: changed
+    depends_on: [propose]
+
+  - id: abort_on_test_failure
+    action: control
+    conditions:
+      - if: "${{ steps.tests.outputs.tests_can_run == false || steps.tests.outputs.failed > 0 }}"
+    then:
+      - terminate:
+          skipped_reason: "tests failed or could not run after refactor — backing out"
+    depends_on: [tests]
+
+  - id: size_gate
+    action: __approval_gate__
+    conditions:
+      - if: "${{ steps.propose.outputs.lines_changed > 400 }}"
+    compliance:
+      approval_gate: true
+      approval_channel: slack
+      approval_message: "Refactor in ${{ inputs.target_repo }} would change ${{ steps.propose.outputs.lines_changed }} LOC. Approve?"
+      timeout_minutes: 240
+    depends_on: [abort_on_test_failure]
+
+  - id: open_pr
+    action: skill
+    skill: open-pr
+    inputs:
+      repo: ${{ inputs.target_repo }}
+      branch: "surgeon/${{ session.id }}"
+      base: ${{ steps.detect_conv.outputs.default_branch || 'main' }}
+      title: "[surgeon:refactor] ${{ steps.propose.outputs.title }}"
+      labels: ["surgeon:refactor", "needs-review"]
+    depends_on: [size_gate]
+
+  - id: update_memory
+    action: skill
+    skill: update-memory
+    inputs:
+      target_repo: ${{ inputs.target_repo }}
+      session_outcome: pr_opened
+      pr_url: ${{ steps.open_pr.outputs.pr_url }}
+    depends_on: [open_pr]

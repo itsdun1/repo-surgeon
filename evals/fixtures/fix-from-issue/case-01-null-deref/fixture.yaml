@@ -1,0 +1,41 @@
+id: fix-null-deref-01
+mode: fix-from-issue
+target_repo: eval-target
+issue:
+  title: "Crash on empty user list"
+  body: |
+    When the users array is empty, the dashboard throws TypeError:
+    Cannot read property 'name' of undefined.
+
+    Repro:
+    1. Visit /dashboard with no users
+    2. Page crashes
+
+    Expected: Show empty state instead of crashing.
+  labels: ["bug", "surgeon:fix"]
+seed_files:
+  - path: "src/dashboard.ts"
+    content: |
+      export function renderDashboard(users: User[]) {
+        const firstUser = users[0];
+        return `<h1>Welcome ${firstUser.name}</h1>`;  // crashes if users empty
+      }
+  - path: "src/dashboard.test.ts"
+    content: |
+      import { renderDashboard } from './dashboard';
+      describe('renderDashboard', () => {
+        it('shows the first user name', () => {
+          expect(renderDashboard([{name: 'Alice'}])).toContain('Alice');
+        });
+      });
+assertions:
+  - kind: pr_opened
+  - kind: file_modified
+    path: "src/dashboard.ts"
+  - kind: test_passes
+    command: "npm test"
+  - kind: pr_body_contains
+    substring: "null check"
+budget:
+  max_cost_usd: 0.50
+  max_duration_s: 180

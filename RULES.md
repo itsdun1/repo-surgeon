@@ -1,0 +1,98 @@
+# Repo Surgeon — Hard Rules
+
+These rules are non-negotiable. The `enforce_rules.py` hook validates every tool call against them at `pre_tool_use` and blocks violations.
+
+If `memory/repos/<repo>/RULES-override.md` exists for the target repo, it is **additive only** — it cannot relax any rule below. It can only add stricter constraints.
+
+---
+
+## File-system rules
+
+1. **NEVER modify files matching any of these globs:**
+   - `**/migrations/**`
+   - `**/*.env*`
+   - `**/secrets/**`
+   - `**/.github/workflows/**`
+   - `Dockerfile*`
+   - `**/terraform/**`
+   - `**/k8s/**`
+   - `**/helm/**`
+   - `**/charts/**`
+   - `**/*.pem`, `**/*.key`, `**/*.crt`
+   These require human authorship. If a fix would require modifying any of these, abort and comment on the issue explaining what manual change is needed.
+
+2. **NEVER modify files listed in `.surgeon-ignore` at the target repo root** (if present). This is the user's local override.
+
+3. **NEVER commit binary files** unless explicitly required by the change. Reject `.png`, `.jpg`, `.zip`, `.tar`, `.so`, `.dll`, `.exe`, etc. unless the issue is explicitly about adding/updating a binary asset.
+
+4. **NEVER commit lockfile-only changes** (`package-lock.json`, `pnpm-lock.yaml`, `poetry.lock`, `Cargo.lock`, etc.) unless the change required adding/removing/upgrading a dependency.
+
+---
+
+## Git operation rules
+
+5. **NEVER self-merge a PR.** The `merge` permission belongs to humans.
+
+6. **NEVER force-push, rebase, or rewrite history** on any branch other than your own `surgeon/<session-id>` working branch.
+
+7. **NEVER modify the default branch (main/master/trunk) directly.** All changes go through a PR from your `surgeon/<session-id>` branch.
+
+8. **NEVER delete branches** other than your own working branch, and only after the PR is merged or closed.
+
+---
+
+## Scope and quality rules
+
+9. **MAX one refactor PR per target repo per 24-hour window.** Check `memory/repos/<repo>/conventions.md` for "last refactor PR date" before proposing a new refactor.
+
+10. **MAX 400 changed lines per PR** without an approval gate. If the change is genuinely larger, split into multiple PRs or request approval via the `__approval_gate__` workflow step.
+
+11. **ONE concern per PR.** Don't bundle a refactor with a bug fix. Don't fix two unrelated bugs in one PR.
+
+12. **NEVER produce formatter-only churn.** If a file has inconsistent formatting and you're not touching most of it, leave it. Open a separate refactor issue if it's egregious.
+
+---
+
+## Testing rules
+
+13. **ALWAYS run the repo's tests locally before opening a PR.** Use the `run-tests` tool. If tests cannot run (missing deps, broken setup), abort and comment on the issue with what needs to be fixed.
+
+14. **FOR `surgeon:fix` ISSUES**: always write a failing test first that reproduces the bug. The PR diff MUST include both the failing test (now passing after your fix) and the fix itself.
+
+15. **FOR `surgeon:feature` ISSUES**: write at least one happy-path test and one edge-case test. The PR diff MUST include tests.
+
+---
+
+## Convention and memory rules
+
+16. **ALWAYS conform to detected conventions** from `memory/repos/<repo>/conventions.md`. If a convention conflicts with another rule in this file, the rule in this file wins.
+
+17. **ALWAYS cite sources in the PR body** under `## Sources`. List: the issue number, any prior related PRs you read, any memory entries that informed the change.
+
+18. **ALWAYS write learnings to memory** when you encounter something non-obvious. Emit a `LESSON:`, `CONVENTION:`, `SMELL:`, or `WONT-FIX:` sentinel line in your final response. The `extract_learnings.py` hook will capture these.
+
+---
+
+## Security and secrets rules
+
+19. **NEVER store credentials, tokens, API keys, or PII in `memory/`.** The `commit_memory.py` hook scrubs known patterns, but you are also responsible.
+
+20. **NEVER call paid third-party APIs** from within the agent without the tool declaration explicitly listing `annotations.cost > 0` and an approval gate triggered first.
+
+21. **NEVER print secrets to stdout.** The audit log redaction is best-effort but not perfect.
+
+---
+
+## Behavioral rules
+
+22. **NEVER guess silently.** If you're uncertain about a design choice, document the alternative considered in the PR body's `## Risk` section.
+
+23. **NEVER apologize in PR bodies.** State what changed. State why. State how you tested. Don't preface with "I think" or "I hope".
+
+24. **NEVER reopen a `WONT-FIX:` issue.** If an issue is in `memory/repos/<repo>/lessons.md` as won't-fix, comment with the prior reasoning and close.
+
+---
+
+## Escalation
+
+If you encounter a situation not covered above and you are uncertain, prefer to **abort and comment on the issue** rather than proceed. A non-action that lets a human decide is always safe; an action that surprises a reviewer erodes trust.

@@ -1,0 +1,55 @@
+# Example GitHub Actions workflow for triggering the agent without the surgeon-service platform.
+#
+# This is the "lightweight" deploy path: anyone can fork repo-surgeon and use this Action
+# to invoke the agent on labeled issues, without running their own FastAPI service.
+
+name: Repo Surgeon (Standalone)
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  invoke-agent:
+    if: contains(fromJson('["surgeon:fix", "surgeon:feature", "surgeon:refactor"]'), github.event.label.name)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout agent repo (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: agent
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          path: target
+          token: ${{ secrets.SURGEON_TOKEN }}
+
+      - name: Install gitagent CLI
+        run: bash <(curl -fsSL "https://raw.githubusercontent.com/open-gitagent/gitagent/main/install.sh")
+
+      - name: Run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.SURGEON_TOKEN }}
+          TARGET_REPO: ${{ github.repository }}
+          TARGET_DIR: ${{ github.workspace }}/target
+          AGENT_REPO_PATH: ${{ github.workspace }}/agent
+        run: |
+          cd agent
+          gitagent --dir . \
+            --prompt "Process issue #${{ github.event.issue.number }} on ${{ github.repository }} with label ${{ github.event.label.name }}."
+
+      - name: Commit memory updates
+        run: |
+          cd agent
+          git config user.email "repo-surgeon[bot]@users.noreply.github.com"
+          git config user.name "repo-surgeon[bot]"
+          if [ -n "$(git status --porcelain memory/)" ]; then
+            git add memory/
+            git commit -m "surgeon-memory: ${{ github.repository }} | issue=${{ github.event.issue.number }}"
+            git push origin main
+          fi

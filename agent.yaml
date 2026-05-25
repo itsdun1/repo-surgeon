@@ -1,0 +1,129 @@
+spec_version: "0.3"
+name: repo-surgeon
+version: 1.0.0
+description: >
+  Autonomous, multi-repo refactoring and bug-fixing agent. Lives across a
+  portfolio of repositories. Reads issues, opens PRs, compounds learnings
+  into git-tracked memory. Never self-merges. Designed for the GitAgent
+  Protocol (GAP).
+author: aditya-kale
+license: Apache-2.0
+tags:
+  - gitagent
+  - autonomous-coding
+  - multi-repo
+  - refactoring
+
+model:
+  preferred: anthropic:claude-opus-4-7
+  fallback:
+    - anthropic:claude-sonnet-4-6
+    - openai:gpt-5.1
+  constraints:
+    max_tokens_per_turn: 16000
+    temperature: 0.2
+    extended_thinking: true
+
+runtime:
+  max_turns: 40
+  timeout: 1800
+  # The dispatcher sets TARGET_DIR env var to the ephemeral target-repo clone.
+  workspace: ${{ env.TARGET_DIR }}
+  session_resume: true
+
+skills:
+  - load-repo-context
+  - classify-issue
+  - scan-for-smells
+  - propose-refactor
+  - fix-from-issue
+  - implement-feature
+  - write-test
+  - run-tests-validate
+  - open-pr
+  - update-memory
+
+tools:
+  # Built-in tools provided by the gitagent runtime
+  - cli
+  - read
+  - write
+  - edit
+  - memory
+  - task_tracker
+  - skill_learner
+  # Custom tools defined in tools/
+  - github-api
+  - run-tests
+  - codebase-grep
+  - read-issue
+  - detect-conventions
+
+agents:
+  security-reviewer:
+    path: agents/security-reviewer.md
+    description: >
+      Adversarial security review of diffs touching auth, crypto, HTTP
+      endpoints, session handling, or SQL construction.
+    delegation:
+      mode: explicit
+      triggers:
+        - "diff touches files matching: *auth*, *crypto*, *jwt*, *session*, *password*, *token*"
+        - "diff adds new HTTP route or endpoint"
+        - "diff modifies SQL query construction"
+
+delegation:
+  default: self
+  routing:
+    - when: "tool_call.annotations.requires_confirmation == true"
+      to: approval_gate
+    - when: "diff.security_sensitive == true"
+      to: security-reviewer
+
+mcp_servers:
+  # Optional MCP server for GitHub. If not installed, custom github-api tool is used.
+  - name: github
+    transport: stdio
+    command: ["npx", "-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${{ env.GITHUB_TOKEN }}
+    optional: true
+
+compliance:
+  risk_tier: medium
+  supervision: human_in_the_loop_on_merge
+
+  recordkeeping:
+    audit_logging: true
+    audit_log: hooks/audit-trail.jsonl
+    retention_days: 365
+    include_diffs: true
+
+  segregation_of_duties:
+    enforcement: strict
+    roles:
+      - name: author
+        permissions: [propose, comment, label, branch_push]
+        agent: repo-surgeon
+      - name: reviewer
+        permissions: [approve, request_changes, comment]
+        agent: human
+      - name: merger
+        permissions: [merge, close]
+        agent: human
+    rules:
+      - author_cannot_merge: true
+      - require_one_human_approval_before_merge: true
+
+  audit_logging:
+    events: [pre_tool_use, post_tool_use, on_error, post_response, on_session_end]
+    sink: hooks/audit-trail.jsonl
+    redact:
+      - GITHUB_TOKEN
+      - ANTHROPIC_API_KEY
+      - OPENAI_API_KEY
+      - GITHUB_APP_PRIVATE_KEY
+
+  data_governance:
+    pii_handling: redact
+    data_classification: internal

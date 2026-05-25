@@ -1,0 +1,62 @@
+name: run-tests
+version: 1.0.0
+description: >
+  Auto-detect the test runner (pytest, jest, vitest, go test, cargo test, mvn,
+  gradle, rspec, mocha), execute scoped to changed files or full suite, parse
+  pass/fail and failure context.
+
+input_schema:
+  type: object
+  required: [working_dir]
+  properties:
+    working_dir:
+      type: string
+      description: "Path to target repo workspace"
+    scope:
+      type: string
+      enum: [all, changed, file]
+      default: changed
+    target_files:
+      type: array
+      items: {type: string}
+      description: "If scope=file, the specific files/patterns to run"
+    runner_override:
+      type: string
+      description: "Force a specific runner if auto-detect fails"
+    timeout_s:
+      type: integer
+      default: 600
+
+output_schema:
+  type: object
+  properties:
+    runner: {type: string}
+    command_used: {type: string}
+    passed: {type: integer}
+    failed: {type: integer}
+    skipped: {type: integer}
+    duration_s: {type: number}
+    failures:
+      type: array
+      items:
+        type: object
+        properties:
+          test: {type: string}
+          error: {type: string}
+          stack: {type: string}
+    exit_code: {type: integer}
+    tests_can_run: {type: boolean}
+    error: {type: string}
+
+implementation:
+  type: script
+  path: tools/run-tests.py
+  runtime: python3
+  timeout: 700
+
+annotations:
+  requires_confirmation: false
+  read_only: true
+  cost: 0
+  idempotent: true
+  compliance_sensitive: false

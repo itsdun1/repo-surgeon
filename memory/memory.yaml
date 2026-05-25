@@ -1,0 +1,63 @@
+spec_version: "0.1"
+
+# Memory layer configuration. The agent's memory is a tree of markdown files,
+# git-committed, namespaced by target repo. This file declares how each layer
+# behaves.
+
+layers:
+  - name: index
+    path: memory/MEMORY.md
+    max_lines: 300
+    rotation: archive
+    description: "Top-level summary and index of all namespaces."
+
+  - name: org
+    path: memory/org/
+    max_lines_per_file: 500
+    rotation: archive
+    description: "Org-wide truths — tech stack, team conventions, glossary. Always loaded."
+
+  - name: repo
+    path: memory/repos/
+    max_lines_per_file: 800
+    rotation: archive
+    description: "Per-target-repo memory. Loaded only when TARGET_REPO matches."
+
+  - name: session
+    path: memory/sessions/
+    max_lines_per_file: 2000
+    rotation: discard_after_days
+    rotation_days: 30
+    description: "Ephemeral session scratch. Deduped + merged into canonical layers at session end."
+
+  - name: archive
+    path: memory/archive/
+    rotation: never
+    description: "Rotated content from the layers above. Keep for audit."
+
+update_triggers:
+  - on_session_end
+  - on_demand:
+      via_skill: update-memory
+
+commit:
+  auto: true
+  message_template: "surgeon-memory: {scope} | session={session_id} | {summary}"
+  push_to_remote: true
+  remote_branch: main
+
+namespaces:
+  active_resolver: "env.TARGET_REPO -> memory/repos/${TARGET_REPO}"
+  always_load:
+    - memory/MEMORY.md
+    - memory/org/
+
+redaction:
+  # Patterns scrubbed from all memory writes (defense in depth — hooks also redact)
+  patterns:
+    - "ghp_[A-Za-z0-9_]{30,}"
+    - "gho_[A-Za-z0-9_]{30,}"
+    - "ghs_[A-Za-z0-9_]{30,}"
+    - "sk-[A-Za-z0-9_\\-]{30,}"
+    - "sk-ant-[A-Za-z0-9_\\-]{30,}"
+    - "-----BEGIN [A-Z ]+ KEY-----"

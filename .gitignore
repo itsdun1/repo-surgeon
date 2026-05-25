@@ -1,0 +1,22 @@
+# Runtime cache (created at session start)
+.gitagent/
+.surgeon-cache/
+
+# Ephemeral session scratch (deduped into canonical memory at session end)
+memory/sessions/*
+!memory/sessions/.gitkeep
+
+# Eval reports
+evals/reports/*
+!evals/reports/.gitkeep
+
+# Audit trail is local-only
+hooks/audit-trail.jsonl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
